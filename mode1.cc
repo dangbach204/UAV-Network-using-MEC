@@ -1,9 +1,3 @@
-/*
- * Scenario 1 ADVANCED: UAV-mounted MEC with Migration Penalty & FlowMonitor
- * Status: UPDATED based on Expert Review
- * NS-3 version 3.43 compatible
- */
-
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
 #include "ns3/internet-module.h"
@@ -24,7 +18,7 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE("ScenarioUavMecAdvanced");
 
-// ==================== BIẾN TOÀN CỤC & STRUCT ====================
+// ========== biến toàn cục và struct ==========
 std::ofstream rsrpFile, sinrFile, throughputFile, handoverFile, positionFile, cellIdFile, handoverQualityFile, uavPositionFile, mecOffloadFile, hoTraceFile, flowStatsFile;
 
 uint32_t handoverCount = 0;
@@ -32,7 +26,7 @@ uint32_t handoverStartCount = 0;
 std::map<uint32_t, uint64_t> totalRxBytes;
 std::map<uint32_t, double> lastThroughput;
 
-// [NÂNG CẤP] Map để theo dõi UE đang ở Cell nào cho logic MEC
+// Map theo dõi UE đang ở Cell nào
 std::map<uint32_t, uint16_t> ueCurrentCellMap;
 std::map<uint32_t, uint16_t> uePreviousMecCellMap; 
 
@@ -55,7 +49,7 @@ struct OffloadTask {
 std::vector<OffloadTask> offloadTasks;
 uint32_t taskCounter = 0;
 
-// ==================== VISUAL HELPER ====================
+// ============== VISUAL HELPER ======================
 void UpdateUeColor(uint32_t ueIndex, uint16_t cellId) {
     if (pAnim && ueIndex < globalUeNodes.GetN()) {
         uint8_t r=0, g=0, b=0;
@@ -68,13 +62,13 @@ void UpdateUeColor(uint32_t ueIndex, uint16_t cellId) {
     }
 }
 
-// ==================== MEC LOGIC (ĐÃ NÂNG CẤP) ====================
+// ==================== MEC LOGIC  ====================
 void GenerateMecTask(uint32_t ueId) {
     double time = Simulator::Now().GetSeconds();
     double dataSize = 0.1; // Mbits
     double cpuCycles = 2000.0; // Megacycles
     
-    // Lấy throughput hiện tại, nếu thấp quá (do mới khởi động) thì gán mặc định
+    // Lấy throughput hiện tại
     double thpt = lastThroughput[ueId];
     if (thpt < 0.1) thpt = 5.0; 
     
@@ -83,7 +77,7 @@ void GenerateMecTask(uint32_t ueId) {
     double uavCpuSpeed = 5000.0; // Cycles/s
     double procTime = cpuCycles / uavCpuSpeed;
     
-    // [NÂNG CẤP QUAN TRỌNG] Tính toán Migration Penalty
+    // Tính toán Migration Penalty
     double migrationPenalty = 0.0;
     uint16_t currentCell = ueCurrentCellMap[ueId];
     uint16_t prevCell = uePreviousMecCellMap[ueId];
@@ -112,7 +106,7 @@ void GenerateMecTask(uint32_t ueId) {
     
     offloadTasks.push_back({taskCounter++, finalLatency, offloaded, 0.0});
     
-    // Ghi file CSV: Thêm cột MigrationPenalty để vẽ biểu đồ
+    // Ghi file CSV: Thêm MigrationPenalty 
     mecOffloadFile << time << "," << ueId << "," << taskCounter << ","
                    << (offloaded ? "UAV-MEC" : "Local") << ","
                    << finalLatency << "," << thpt << "," << migrationPenalty << std::endl;
@@ -137,7 +131,7 @@ void NotifyHandoverEndOkUe(std::string path, uint64_t imsi, uint16_t cellId, uin
     handoverCount++;
     double time = Simulator::Now().GetSeconds();
     
-    // [NÂNG CẤP] Cập nhật bản đồ vị trí ngay lập tức để MEC biết
+    // Cập nhật bản đồ vị trí ngay lập tức để MEC biết
     ueCurrentCellMap[imsi] = cellId; 
 
     if (IsPingPongHandover(imsi, cellId)) pingPongHandoverCount++;
@@ -179,8 +173,6 @@ void RecvMeasurementReportCallback(std::string path, uint64_t imsi, uint16_t cel
 }
 
 void ReportRsrp(uint64_t imsi, uint16_t cellId, uint16_t rnti, double rsrp, double sinr, uint8_t ccId) {
-    // Callback này gọi rất nhiều lần, chỉ log khi cần thiết hoặc giảm tần suất
-    // Ở đây log full để vẽ đồ thị đẹp
     rsrpFile << Simulator::Now().GetSeconds() << "," << imsi << "," << cellId << "," << rsrp << std::endl;
     sinrFile << Simulator::Now().GetSeconds() << "," << imsi << "," << sinr << std::endl;
 }
@@ -254,7 +246,7 @@ int main(int argc, char *argv[])
     //lteHelper->SetAttribute("PathlossModel", StringValue("ns3::FriisPropagationLossModel"));
     lteHelper->SetAttribute("PathlossModel", StringValue("ns3::LogDistancePropagationLossModel"));
     
-    // Cấu hình môi trường truyền sóng (Exponent = 3.0 tương đương đô thị, Friis chỉ là 2.0)
+    // Cấu hình môi trường truyền sóng (Exponent = 3.0 tương đương đô thị)
     lteHelper->SetPathlossModelAttribute("Exponent", DoubleValue(3.0)); 
     lteHelper->SetPathlossModelAttribute("ReferenceLoss", DoubleValue(46.67)); // Chuẩn LTE 2GHz
     
@@ -281,16 +273,16 @@ int main(int argc, char *argv[])
     // 2. Đặt PGW (Gateway) thấp hơn Server một chút
     corePos->Add(Vector(10, 200, 0));
     
-    // 3. SGW (Serving Gateway) - Node này do EPC Helper tự tạo, thường là Node số 1
+    // 3. SGW (Serving Gateway) - do EPC Helper tự tạo, là Node số 1
     corePos->Add(Vector(30, 180, 0));
     
-    // 4. MME (Quản lý di động) - Node này do EPC Helper tự tạo, thường là Node số 2
+    // 4. MME (Quản lý di động) -  do EPC Helper tự tạo, là Node số 2
     corePos->Add(Vector(10, 160, 0));
 
     coreMobility.SetPositionAllocator(corePos);
     coreMobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
     
-    // Cài đặt vị trí cho Remote Host trước
+    // Cài đặt vị trí cho Remote Host 
     coreMobility.Install(remoteHostContainer);
     
     // Cài đặt vị trí cho PGW
@@ -302,11 +294,11 @@ int main(int argc, char *argv[])
     sgwContainer.Add(sgw);
     coreMobility.Install(sgwContainer);
     
-    // MME thường là Node có ID = 2 trong kịch bản này
+    // MME là Node có ID = 2 
     Ptr<Node> mme = NodeList::GetNode(2); 
     NodeContainer mmeContainer;
     mmeContainer.Add(mme);
-    // Nó sẽ lấy vị trí thứ 4 trong ListPositionAllocator (Vector 10, 160, 0)
+    // lấy vị trí thứ 4 trong ListPositionAllocator (Vector 10, 160, 0)
     coreMobility.Install(mmeContainer);
     
     // Nodes
@@ -318,19 +310,19 @@ int main(int argc, char *argv[])
     mob.SetMobilityModel("ns3::WaypointMobilityModel");
     mob.Install(uavEnbNodes); 
     
-    // UAV 1: Bay tuần tra quanh khu vực (80, 80) với bán kính ~40m
+    // UAV 1: Bay tuần tra quanh khu vực (80, 80) với bán kính 40m
     Ptr<WaypointMobilityModel> uav1 = uavEnbNodes.Get(0)->GetObject<WaypointMobilityModel>();
     uav1->AddWaypoint(Waypoint(Seconds(0), Vector(80, 80, 30)));
-    uav1->AddWaypoint(Waypoint(Seconds(25), Vector(120, 80, 30))); // Bay sang phải 40m
-    uav1->AddWaypoint(Waypoint(Seconds(50), Vector(80, 120, 30))); // Bay lên trên
-    uav1->AddWaypoint(Waypoint(Seconds(75), Vector(40, 80, 30)));  // Bay sang trái
-    uav1->AddWaypoint(Waypoint(Seconds(99), Vector(80, 80, 30)));  // Về chỗ cũ
+    uav1->AddWaypoint(Waypoint(Seconds(25), Vector(120, 80, 30))); 
+    uav1->AddWaypoint(Waypoint(Seconds(50), Vector(80, 120, 30)));
+    uav1->AddWaypoint(Waypoint(Seconds(75), Vector(40, 80, 30)));  
+    uav1->AddWaypoint(Waypoint(Seconds(99), Vector(80, 80, 30)));  
 
     // UAV 2: Bay quanh khu vực (220, 80)
     Ptr<WaypointMobilityModel> uav2 = uavEnbNodes.Get(1)->GetObject<WaypointMobilityModel>();
     uav2->AddWaypoint(Waypoint(Seconds(0), Vector(220, 80, 30)));
-    uav2->AddWaypoint(Waypoint(Seconds(30), Vector(220, 40, 30))); // Bay xuống 40m
-    uav2->AddWaypoint(Waypoint(Seconds(60), Vector(260, 80, 30))); // Bay sang phải
+    uav2->AddWaypoint(Waypoint(Seconds(30), Vector(220, 40, 30))); 
+    uav2->AddWaypoint(Waypoint(Seconds(60), Vector(260, 80, 30))); 
     uav2->AddWaypoint(Waypoint(Seconds(99), Vector(220, 80, 30)));
 
     // UAV 3: Bay quanh khu vực (150, 220)
@@ -343,26 +335,26 @@ int main(int argc, char *argv[])
     // --- SETUP UE 1 ---
     MobilityHelper ue1Mob;
     Ptr<ListPositionAllocator> ue1Pos = CreateObject<ListPositionAllocator>();
-    ue1Pos->Add(Vector(60, 99, 1.5)); // Vị trí khởi tạo NẰM TRONG Bounds
+    ue1Pos->Add(Vector(60, 99, 1.5)); // Vị trí khởi tạo nằm trong Bounds
     ue1Mob.SetPositionAllocator(ue1Pos);
     ue1Mob.SetMobilityModel("ns3::RandomWalk2dMobilityModel",
                             "Bounds", RectangleValue(Rectangle(50, 100, 50, 100)), // Vùng đi quanh UAV 1
                             "Speed", StringValue("ns3::UniformRandomVariable[Min=1.0|Max=2.0]"),
                             "Mode", StringValue("Time"));
-    ue1Mob.Install(globalUeNodes.Get(0)); // Cài cho UE 1
+    ue1Mob.Install(globalUeNodes.Get(0)); 
     
     // --- SETUP UE 3 ---
     MobilityHelper ue3Mob;
     Ptr<ListPositionAllocator> ue3Pos = CreateObject<ListPositionAllocator>();
-    ue3Pos->Add(Vector(135, 220, 1.5)); // Vị trí khởi tạo NẰM TRONG Bounds (Quan trọng!)
+    ue3Pos->Add(Vector(135, 220, 1.5)); // Vị trí khởi tạo nằm trong Bounds
     ue3Mob.SetPositionAllocator(ue3Pos);
     ue3Mob.SetMobilityModel("ns3::RandomWalk2dMobilityModel",
                             "Bounds", RectangleValue(Rectangle(130, 180, 200, 240)), // Vùng đi quanh UAV 3
                             "Speed", StringValue("ns3::UniformRandomVariable[Min=1.0|Max=2.0]"),
                             "Mode", StringValue("Time"));
-    ue3Mob.Install(globalUeNodes.Get(2)); // Cài cho UE 3
+    ue3Mob.Install(globalUeNodes.Get(2)); 
     
-    // UE2 Patrol Path (Moving UE)
+    // UE2 (Moving UE)
     Ptr<ListPositionAllocator> p2 = CreateObject<ListPositionAllocator>(); p2->Add(Vector(75, 75, 1.5));
     mob.SetPositionAllocator(p2); mob.SetMobilityModel("ns3::WaypointMobilityModel"); mob.Install(globalUeNodes.Get(1));
     Ptr<WaypointMobilityModel> wp = globalUeNodes.Get(1)->GetObject<WaypointMobilityModel>();
@@ -372,15 +364,15 @@ int main(int argc, char *argv[])
     //wp->AddWaypoint(Waypoint(Seconds(99), Vector(220, 80, 1.5)));
     
     wp->AddWaypoint(Waypoint(Seconds(0.1), Vector(75, 75, 1.5)));   // Bắt đầu
-    wp->AddWaypoint(Waypoint(Seconds(10.0), Vector(110, 76, 1.5))); // Điểm giữa 1
-    wp->AddWaypoint(Waypoint(Seconds(20.0), Vector(145, 78, 1.5))); // Điểm giữa 2
-    wp->AddWaypoint(Waypoint(Seconds(30.0), Vector(180, 79, 1.5))); // Điểm giữa 3
-    wp->AddWaypoint(Waypoint(Seconds(40.0), Vector(220, 80, 1.5))); // Đến đích
+    wp->AddWaypoint(Waypoint(Seconds(10.0), Vector(110, 76, 1.5))); 
+    wp->AddWaypoint(Waypoint(Seconds(20.0), Vector(145, 78, 1.5))); 
+    wp->AddWaypoint(Waypoint(Seconds(30.0), Vector(180, 79, 1.5))); 
+    wp->AddWaypoint(Waypoint(Seconds(40.0), Vector(220, 80, 1.5))); 
     wp->AddWaypoint(Waypoint(Seconds(50.0), Vector(220, 100, 1.5))); 
     wp->AddWaypoint(Waypoint(Seconds(60.0), Vector(200, 150, 1.5)));
     wp->AddWaypoint(Waypoint(Seconds(70.0), Vector(180, 180, 1.5))); 
     wp->AddWaypoint(Waypoint(Seconds(80.0), Vector(150, 200, 1.5))); 
-    wp->AddWaypoint(Waypoint(Seconds(99.0), Vector(130, 220, 1.5))); // Đứng yên
+    wp->AddWaypoint(Waypoint(Seconds(99.0), Vector(130, 220, 1.5)));
     
     // Building Environment
     BuildingsHelper::Install(uavEnbNodes); BuildingsHelper::Install(globalUeNodes);
@@ -410,19 +402,19 @@ int main(int argc, char *argv[])
     lteHelper->Attach(ueDevs.Get(2), uavDevs.Get(2));
     lteHelper->AddX2Interface(uavEnbNodes); 
     
-    // Apps (UDP Traffic - FIX LỖI THROUGHPUT)
+    // Apps (UDP Traffic)
     uint16_t port = 1234;
     ApplicationContainer apps;
     
     for(uint32_t i=0; i<globalUeNodes.GetN(); ++i) {
-        // 1. Cài Sink (Nhận tin) trên UE - Dùng UDP
+        // Cài Sink (Nhận tin) trên UE - Dùng UDP
         PacketSinkHelper sink("ns3::UdpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), port));
         apps.Add(sink.Install(globalUeNodes.Get(i)));
         
         // 2. Cài Client (Gửi tin) trên Remote Host bắn về IP của UE
         UdpClientHelper client(ueIp.GetAddress(i), port);
         
-        // Cấu hình: Gửi liên tục, mỗi gói 1024 bytes, cách nhau 1ms (~8 Mbps)
+        // Cấu hình: Gửi liên tục, mỗi gói 1472 bytes, cách nhau 4ms (~3 Mbps)
         client.SetAttribute("MaxPackets", UintegerValue(100000000));
         client.SetAttribute("Interval", TimeValue(MilliSeconds(4.0))); 
         client.SetAttribute("PacketSize", UintegerValue(1472));
@@ -435,11 +427,11 @@ int main(int argc, char *argv[])
         ueCurrentCellMap[i+1] = 0; 
         uePreviousMecCellMap[i+1] = 0;
     }
-    // Start trễ 1 giây để mạng LTE kịp khởi động xong
+    // Start trễ 1 giây để mạng LTE kịp khởi động 
     apps.Start(Seconds(1.0));
     
     // MEC Simulation Loop
-    for(double t=2.0; t<simTime; t+=2.0) Simulator::Schedule(Seconds(t), &GenerateMecTask, 2); // Focus monitoring UE 2
+    for(double t=2.0; t<simTime; t+=2.0) Simulator::Schedule(Seconds(t), &GenerateMecTask, 2); 
     
     // Traces
     Config::Connect("/NodeList/*/DeviceList/*/LteUeRrc/HandoverStart", MakeCallback(&NotifyHandoverStartUe));
@@ -475,7 +467,7 @@ int main(int argc, char *argv[])
     // Remote Host (Server)
     pAnim->UpdateNodeDescription(remoteHost, "SERVER (Remote Host)");
     pAnim->UpdateNodeColor(remoteHost, 0, 0, 255); // Màu Xanh Dương Đậm
-    pAnim->UpdateNodeSize(remoteHost, 2.0, 2.0); // To hơn chút
+    pAnim->UpdateNodeSize(remoteHost, 2.0, 2.0); 
 
     // PGW
     pAnim->UpdateNodeDescription(pgw, "PGW (Gateway)");
